@@ -23,10 +23,21 @@ def melange(c1, c2, t: float):
 
 @lru_cache(maxsize=32)
 def police(taille: int, style: str = "normal") -> pg.font.Font:
+    if cfg.WEB:
+        # Le navigateur n'a pas Segoe UI : on embarque DejaVu Sans (police libre, voir assets/polices).
+        # Elle est un peu plus large, d'où le léger rétrécissement pour garder la même mise en page.
+        fichier = "DejaVuSans.ttf" if style == "normal" else "DejaVuSans-Bold.ttf"
+        return pg.font.Font(cfg.POLICES / fichier, u(taille * 0.9))
     noms = {"titre": "segoeuiblack,arialblack,impact", "gras": "segoeuisemibold,segoeui,arial",
             "normal": "segoeui,arial"}[style]
     f = pg.font.SysFont(noms, u(taille), bold=style == "gras")
     return f
+
+
+@lru_cache(maxsize=1024)
+def rendu(msg: str, taille: int, style: str, couleur: tuple) -> pg.Surface:
+    """Texte déjà dessiné. Le redessiner à chaque image coûtait cher (surtout dans le navigateur)."""
+    return police(taille, style).render(msg, True, couleur)
 
 
 def panneau(w: int, h: int, alpha: int = 190, rayon: int = 16, bord=None, epaisseur: int = 2) -> pg.Surface:
@@ -42,13 +53,12 @@ def panneau(w: int, h: int, alpha: int = 190, rayon: int = 16, bord=None, epaiss
 
 def texte(surf, msg, taille, color, pos, ancre="center", style="gras", ombre=True, alpha=255, echelle=1.0,
           contour=0) -> pg.Rect:
-    f = police(taille, style)
-    s = f.render(msg, True, color)
+    s = rendu(msg, taille, style, tuple(color))
     if echelle != 1.0:
         s = pg.transform.smoothscale_by(s, max(0.01, echelle))
     r = s.get_rect(**{ancre: pos})
     if contour:                                     # contour épais pour les gros titres
-        c = f.render(msg, True, (15, 12, 20))
+        c = rendu(msg, taille, style, (15, 12, 20))
         if echelle != 1.0:
             c = pg.transform.smoothscale_by(c, max(0.01, echelle))
         c.set_alpha(alpha)
@@ -56,7 +66,7 @@ def texte(surf, msg, taille, color, pos, ancre="center", style="gras", ombre=Tru
         for ox, oy in ((-e, 0), (e, 0), (0, -e), (0, e), (-e, -e), (e, e), (-e, e), (e, -e), (0, e * 2)):
             surf.blit(c, r.move(ox, oy))
     elif ombre:
-        sh = f.render(msg, True, (0, 0, 0))
+        sh = rendu(msg, taille, style, (0, 0, 0))
         if echelle != 1.0:
             sh = pg.transform.smoothscale_by(sh, max(0.01, echelle))
         sh.set_alpha(int(alpha * 0.55))
@@ -68,8 +78,7 @@ def texte(surf, msg, taille, color, pos, ancre="center", style="gras", ombre=Tru
 
 def touche(surf, label: str, pos, taille=18, ancre="center", actif=False) -> pg.Rect:
     """Dessine une touche de clavier (petite capsule avec la lettre)."""
-    f = police(taille, "gras")
-    s = f.render(label, True, (20, 20, 30))
+    s = rendu(label, taille, "gras", (20, 20, 30))
     w = max(s.get_width() + u(16), u(taille * 1.7))
     h = u(taille * 1.7)
     r = pg.Rect(0, 0, w, h)

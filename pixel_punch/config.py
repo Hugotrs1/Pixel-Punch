@@ -11,6 +11,7 @@ from pathlib import Path
 
 RACINE = Path(__file__).resolve().parent.parent
 SONS = RACINE / "assets" / "sons"
+POLICES = RACINE / "assets" / "polices"
 TITRE = "Pixel Punch"
 FPS = 60
 WEB = sys.platform == "emscripten"   # True quand le jeu tourne dans le navigateur (pygbag)

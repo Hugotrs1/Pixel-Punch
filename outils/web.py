@@ -52,6 +52,8 @@ if __name__ == "__main__":
         pygbag("--build")
         # Les sons sont aussi servis à part : la page les joue avec Web Audio (voir outils/pygbag.tmpl)
         shutil.copytree(RACINE / "assets" / "sons", SORTIE / "sons", dirs_exist_ok=True)
+        # Icône d'onglet : le gant de outils/favicon.png à la place du logo de pygame
+        shutil.copy2(Path(__file__).with_name("favicon.png"), SORTIE / "favicon.png")
         print(f"Build prêt dans {SORTIE}")
         if action == "deploy":
             deployer()

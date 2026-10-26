@@ -19,7 +19,7 @@ from .animation import clamp, ease_out_back
 from .arene import Arene, Particules
 from .boxeur import TENUE_P1, TENUE_P2, Boxeur
 from .controles import DUO_J1, DUO_J2, NOMS_ACTIONS, SOLO, Clavier, etiquette
-from .hud import Sons, melange, panneau, police, texte, touche, u, vignette
+from .hud import Sons, melange, panneau, police, rendu, texte, touche, u, vignette
 from .ia import IA, NIVEAUX
 from .modele import COUPS, ENDURANCE_MAX, Combat, Combattant, Commande, Evenement
 
@@ -34,11 +34,12 @@ VALIDER = (pg.KSCAN_RETURN, pg.KSCAN_KP_ENTER, pg.KSCAN_SPACE)
 def taille_navigateur() -> tuple[int, int]:
     """Version web : taille de la page en vrais pixels (zoom Windows compris), pour une image nette.
 
-    On plafonne à environ 1920 x 1080 pixels au total pour que le jeu reste fluide.
+    On plafonne à environ 1600 x 900 pixels au total pour que le jeu reste fluide
+    (le navigateur agrandit ensuite l'image, sans flou visible sur du pixel art).
     """
     import platform
     largeur, hauteur = platform.window.innerWidth, platform.window.innerHeight
-    echelle = min(platform.window.devicePixelRatio or 1, (1920 * 1080 / (largeur * hauteur)) ** 0.5)
+    echelle = min(platform.window.devicePixelRatio or 1, (1600 * 900 / (largeur * hauteur)) ** 0.5)
     return max(640, round(largeur * echelle)), max(360, round(hauteur * echelle))
 
 
@@ -98,6 +99,7 @@ class Jeu:
             self.ecran = pg.display.set_mode(taille or (1280, 720), pg.RESIZABLE)
         cfg.configurer(*self.ecran.get_size())
         police.cache_clear()
+        rendu.cache_clear()
         self.monde = pg.Surface((cfg.LW, cfg.LH))
         self.vignette = vignette()
         self.arene.construire()
@@ -235,10 +237,13 @@ class Jeu:
     # -- menus ----------------------------------------------------------------------
     def elements_menu(self):
         if self.etat == "pause":
-            return ["Reprendre", "Recommencer", "Commandes", "Menu principal", "Quitter"]
+            elements = ["Reprendre", "Recommencer", "Commandes", "Menu principal", "Quitter"]
+            return elements[:-1] if cfg.WEB else elements
         n2 = "Joueur 2" if self.deux_joueurs else "Adversaire"
-        return ["Combat contre l'ordi", "Combat à 2 joueurs", f"Difficulté   ‹  {self.niveaux[self.niveau]}  ›",
-                f"Joueur 1   :   {self.noms[0]}", f"{n2}   :   {self.noms[1]}", "Commandes", "Quitter"]
+        elements = ["Combat contre l'ordi", "Combat à 2 joueurs", f"Difficulté   ‹  {self.niveaux[self.niveau]}  ›",
+                    f"Joueur 1   :   {self.noms[0]}", f"{n2}   :   {self.noms[1]}", "Commandes", "Quitter"]
+        # Dans le navigateur, « Quitter » laisserait juste un écran noir : on ferme l'onglet à la place.
+        return elements[:-1] if cfg.WEB else elements
 
     def activer(self, i: int) -> bool:
         if self.etat == "pause":
@@ -308,7 +313,7 @@ class Jeu:
                     if self.etat == "pause":
                         self.changer("combat")
                         return True
-                    return False
+                    return cfg.WEB              # sur PC, Échap au menu quitte le jeu ; pas dans le navigateur
                 if sc in NAV_HAUT:
                     self.choix = (self.choix - 1) % n
                 elif sc in NAV_BAS:
@@ -614,7 +619,10 @@ class Jeu:
     def dessiner_menu(self):
         self.dessiner_logo(u(108))
         self.dessiner_liste(u(250))
-        texte(self.ecran, "↑ ↓ choisir   ·   Entrée valider   ·   F11 plein écran / fenêtre   ·   Échap quitter", 15,
+        aide = "↑ ↓ choisir   ·   Entrée valider"
+        if not cfg.WEB:
+            aide += "   ·   F11 plein écran / fenêtre   ·   Échap quitter"
+        texte(self.ecran, aide, 15,
               (190, 195, 215), (cfg.W / 2, cfg.H - u(26)), style="normal", ombre=False)
 
     def dessiner_pause(self):
