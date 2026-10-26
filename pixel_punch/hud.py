@@ -100,6 +100,14 @@ class Sons:
     def __init__(self):
         self.sons: dict[str, pg.mixer.Sound] = {}
         self.actif = True
+        self.web = None
+        if cfg.WEB:
+            # Dans le navigateur : sons joués par Web Audio (objet sonsWeb défini dans outils/pygbag.tmpl).
+            # Ils ne dépendent plus de la vitesse du jeu, donc plus de grésillement ni de retard.
+            import platform
+            self.web = platform.window.sonsWeb
+            self.web.charger(",".join(f.stem for f in cfg.SONS.glob("*.ogg")))
+            return
         try:
             pg.mixer.init()
             for f in cfg.SONS.glob("*.ogg"):
@@ -109,6 +117,8 @@ class Sons:
 
     def jouer(self, nom: str, volume: float = 1.0):
         nom = nom.rsplit(".", 1)[0]
-        if self.actif and nom in self.sons:
+        if self.actif and self.web is not None:
+            self.web.jouer(nom, volume)
+        elif self.actif and nom in self.sons:
             self.sons[nom].set_volume(volume)
             self.sons[nom].play()

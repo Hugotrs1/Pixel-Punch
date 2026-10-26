@@ -50,6 +50,8 @@ if __name__ == "__main__":
         pygbag()
     elif action in ("build", "deploy"):
         pygbag("--build")
+        # Les sons sont aussi servis à part : la page les joue avec Web Audio (voir outils/pygbag.tmpl)
+        shutil.copytree(RACINE / "assets" / "sons", SORTIE / "sons", dirs_exist_ok=True)
         print(f"Build prêt dans {SORTIE}")
         if action == "deploy":
             deployer()

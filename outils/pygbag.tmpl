@@ -277,8 +277,42 @@ function show_infobox() {
            right: 10px;
            border: 1px solid black;
         }
+        /* Pixel Punch : le jeu remplit toute la page (sa résolution suit la taille de la fenêtre, voir interface.py) */
+        #canvas {
+            width: 100vw !important;
+            height: 100vh !important;
+            inset: 0 !important;
+            margin: 0 !important;
+            outline: none;
+        }
     </style>
 
+    <script>
+    // Pixel Punch : les sons sont joués par Web Audio, le moteur audio du navigateur.
+    // Le son de pygame dans le navigateur grésille dès que le jeu a une image un peu lente.
+    window.sonsWeb = {
+        ctx: null,
+        buffers: {},
+        async charger(noms) {
+            this.ctx = this.ctx || new (window.AudioContext || window.webkitAudioContext)({ latencyHint: "interactive" });
+            await Promise.all(noms.split(",").map(async (nom) => {
+                const reponse = await fetch("sons/" + nom + ".ogg");
+                this.buffers[nom] = await this.ctx.decodeAudioData(await reponse.arrayBuffer());
+            }));
+        },
+        jouer(nom, volume) {
+            const buffer = this.buffers[nom];
+            if (!this.ctx || !buffer) return;
+            if (this.ctx.state === "suspended") this.ctx.resume();
+            const source = this.ctx.createBufferSource();
+            const gain = this.ctx.createGain();
+            source.buffer = buffer;
+            gain.gain.value = volume;
+            source.connect(gain).connect(this.ctx.destination);
+            source.start();
+        },
+    };
+    </script>
     <script>
 /*
         if (navigator.serviceWorker)

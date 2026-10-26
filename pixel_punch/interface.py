@@ -31,9 +31,15 @@ NAV_GAUCHE = (pg.KSCAN_LEFT, pg.KSCAN_A)
 NAV_DROITE = (pg.KSCAN_RIGHT, pg.KSCAN_D)
 VALIDER = (pg.KSCAN_RETURN, pg.KSCAN_KP_ENTER, pg.KSCAN_SPACE)
 
-# Version navigateur (pygbag) : taille fixe en 16:9, c'est la page web qui l'agrandit à l'écran.
-WEB = sys.platform == "emscripten"
-TAILLE_WEB = (1280, 720)
+def taille_navigateur() -> tuple[int, int]:
+    """Version web : taille de la page en vrais pixels (zoom Windows compris), pour une image nette.
+
+    On plafonne à environ 1920 x 1080 pixels au total pour que le jeu reste fluide.
+    """
+    import platform
+    largeur, hauteur = platform.window.innerWidth, platform.window.innerHeight
+    echelle = min(platform.window.devicePixelRatio or 1, (1920 * 1080 / (largeur * hauteur)) ** 0.5)
+    return max(640, round(largeur * echelle)), max(360, round(hauteur * echelle))
 
 
 def rendre_net_sous_windows():
@@ -49,12 +55,17 @@ def rendre_net_sous_windows():
 class Jeu:
     def __init__(self, plein_ecran: bool = True):
         rendre_net_sous_windows()
-        # Son en 48 kHz stéréo comme les fichiers .ogg (et comme la plupart des cartes son et navigateurs) :
-        # sans conversion, pas de son déformé. À régler AVANT pg.init(), qui ouvre la sortie audio.
+        # Son en 48 kHz stéréo comme les fichiers .ogg : sans conversion, pas de son déformé.
+        # À régler AVANT pg.init(), qui ouvre la sortie audio.
         pg.mixer.pre_init(48000, -16, 2, 1024)
         pg.init()
+        if cfg.WEB:
+            # Dans le navigateur, le son de pygame grésille dès qu'une image est un peu lente :
+            # on coupe sa sortie audio et les sons passent par le navigateur (voir Sons dans hud.py).
+            pg.mixer.quit()
         pg.display.set_caption(cfg.TITRE)
         self.horloge = pg.time.Clock()
+        self.t_taille = 0.0                 # version web : temps depuis la dernière vérification de la taille
         self.rng = random.Random()
         self.arene = Arene(self.rng)
         self.plein_ecran = plein_ecran
@@ -78,8 +89,9 @@ class Jeu:
 
     # -- fenêtre --------------------------------------------------------------
     def ouvrir_fenetre(self, taille=None):
-        if WEB:
-            self.ecran = pg.display.set_mode(TAILLE_WEB)
+        if cfg.WEB:
+            self.taille_web = taille_navigateur()
+            self.ecran = pg.display.set_mode(self.taille_web)
         elif self.plein_ecran:
             self.ecran = pg.display.set_mode((0, 0), pg.FULLSCREEN)
         else:
@@ -268,10 +280,10 @@ class Jeu:
         if e.type == pg.QUIT:
             return False
         self.clavier.evenement(e)
-        if e.type == pg.VIDEORESIZE and not self.plein_ecran and not WEB:
+        if e.type == pg.VIDEORESIZE and not self.plein_ecran and not cfg.WEB:
             self.ouvrir_fenetre((max(640, e.w), max(360, e.h)))
             return True
-        if e.type == pg.KEYDOWN and e.key == pg.K_F11 and not WEB:
+        if e.type == pg.KEYDOWN and e.key == pg.K_F11 and not cfg.WEB:
             self.plein_ecran = not self.plein_ecran
             self.ouvrir_fenetre()
             return True
@@ -662,6 +674,15 @@ class Jeu:
         texte(self.ecran, "Échap ou Entrée pour revenir", 15, (180, 185, 205), (W / 2, cfg.H - u(26)),
               style="normal", ombre=False)
 
+    def suivre_taille_page(self, dt: float):
+        """Version web : si la fenêtre du navigateur change de taille, le jeu s'adapte (vérifié 2 fois par seconde)."""
+        self.t_taille += dt
+        if self.t_taille < 0.5:
+            return
+        self.t_taille = 0.0
+        if taille_navigateur() != self.taille_web:
+            self.ouvrir_fenetre()
+
     # -- boucle principale ------------------------------------------------------------------
     async def run(self):
         """Boucle « async » pour pouvoir tourner dans le navigateur (pygbag).
@@ -670,7 +691,11 @@ class Jeu:
         Sur PC, asyncio.run() lance cette boucle exactement comme avant.
         """
         while True:
-            dt = min(self.horloge.tick(cfg.FPS) / 1000, 0.05)
+            # Dans le navigateur, c'est lui qui cadence les images (60 par seconde) : si pygame attendait
+            # en plus de son côté, on ajouterait du retard entre l'appui sur une touche et l'action.
+            dt = min((self.horloge.tick() if cfg.WEB else self.horloge.tick(cfg.FPS)) / 1000, 0.05)
+            if cfg.WEB:
+                self.suivre_taille_page(dt)
             for e in pg.event.get():
                 if not self.evenement(e):
                     pg.quit()

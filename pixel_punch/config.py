@@ -5,6 +5,7 @@ Le monde est dessiné en petits pixels (environ 270 x 150) puis agrandi d'un fac
 ENTIER pour que le pixel art reste net. Les menus, eux, sont dessinés directement à la
 résolution de l'écran pour que le texte soit parfaitement lisible.
 """
+import sys
 from math import ceil
 from pathlib import Path
 
@@ -12,6 +13,7 @@ RACINE = Path(__file__).resolve().parent.parent
 SONS = RACINE / "assets" / "sons"
 TITRE = "Pixel Punch"
 FPS = 60
+WEB = sys.platform == "emscripten"   # True quand le jeu tourne dans le navigateur (pygbag)
 
 # Dimensions : recalculées par configurer() selon la taille de la fenêtre
 W, H = 1280, 720            # écran (pixels réels)
