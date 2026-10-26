@@ -18,6 +18,13 @@ from .modele import COUPS, Commande
 
 
 def clavier_azerty() -> bool:
+    if sys.platform == "emscripten":
+        # Dans le navigateur, on ne voit pas la disposition du clavier : on se fie à la langue.
+        try:
+            import platform
+            return str(platform.window.navigator.language).lower().startswith("fr")
+        except Exception:
+            return False
     if sys.platform != "win32":
         return False
     try:

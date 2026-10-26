@@ -6,6 +6,7 @@ Elle lit le clavier (ou l'IA), transmet les commandes au modèle, puis transform
 """
 from __future__ import annotations
 
+import asyncio
 import math
 import random
 import sys
@@ -653,7 +654,12 @@ class Jeu:
               style="normal", ombre=False)
 
     # -- boucle principale ------------------------------------------------------------------
-    def run(self):
+    async def run(self):
+        """Boucle « async » pour pouvoir tourner dans le navigateur (pygbag).
+
+        `await asyncio.sleep(0)` rend la main au navigateur à chaque image, sinon la page se fige.
+        Sur PC, asyncio.run() lance cette boucle exactement comme avant.
+        """
         while True:
             dt = min(self.horloge.tick(cfg.FPS) / 1000, 0.05)
             for e in pg.event.get():
@@ -664,3 +670,4 @@ class Jeu:
             self.clavier.nouvelle_image()
             self.dessiner()
             pg.display.flip()
+            await asyncio.sleep(0)

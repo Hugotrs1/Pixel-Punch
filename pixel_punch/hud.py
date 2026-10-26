@@ -91,19 +91,24 @@ def vignette() -> pg.Surface:
 
 
 class Sons:
-    """Charge une seule fois les bruitages du dossier assets/sons."""
+    """Charge une seule fois les bruitages du dossier assets/sons.
+
+    Les sons sont en .ogg : c'est le format lu partout, y compris dans le navigateur (version web).
+    On les range par nom sans extension, donc jouer("Bell.mp3") et jouer("Bell") marchent tous les deux.
+    """
 
     def __init__(self):
         self.sons: dict[str, pg.mixer.Sound] = {}
         self.actif = True
         try:
             pg.mixer.init()
-            for f in cfg.SONS.glob("*.mp3"):
-                self.sons[f.name] = pg.mixer.Sound(f)
+            for f in cfg.SONS.glob("*.ogg"):
+                self.sons[f.stem] = pg.mixer.Sound(f)
         except pg.error:
             pass                                    # pas de carte son : le jeu reste jouable
 
     def jouer(self, nom: str, volume: float = 1.0):
+        nom = nom.rsplit(".", 1)[0]
         if self.actif and nom in self.sons:
             self.sons[nom].set_volume(volume)
             self.sons[nom].play()
