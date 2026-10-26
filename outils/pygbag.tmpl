@@ -285,16 +285,76 @@ function show_infobox() {
             margin: 0 !important;
             outline: none;
         }
+
+        /* Réglage du volume, en haut à droite : le curseur s'ouvre au survol */
+        #volume {
+            position: fixed;
+            top: 14px;
+            right: 14px;
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px;
+            border-radius: 999px;
+            background: rgb(11 11 16 / 0.6);
+            color: #f5f0e6;
+            font-family: system-ui, "Segoe UI", sans-serif;
+            opacity: 0.55;
+            transition: opacity 200ms, background-color 200ms;
+        }
+        #volume:hover, #volume:focus-within {
+            opacity: 1;
+            background: rgb(11 11 16 / 0.85);
+        }
+        #volume button {
+            display: grid;
+            place-items: center;
+            width: 30px;
+            height: 30px;
+            padding: 0;
+            border: 0;
+            border-radius: 50%;
+            background: transparent;
+            color: inherit;
+            cursor: pointer;
+        }
+        #volume button:focus-visible, #volume input:focus-visible {
+            outline: 2px solid #f5c542;
+            outline-offset: 2px;
+        }
+        #volume input {
+            width: 0;
+            opacity: 0;
+            accent-color: #f5c542;
+            cursor: pointer;
+            transition: width 250ms, opacity 250ms;
+        }
+        #volume:hover input, #volume:focus-within input {
+            width: 110px;
+            opacity: 1;
+        }
+        #volume .muet { display: none; }
+        #volume.est-muet .muet { display: block; }
+        #volume.est-muet .ondes { display: none; }
     </style>
 
     <script>
     // Pixel Punch : les sons sont joués par Web Audio, le moteur audio du navigateur.
     // Le son de pygame dans le navigateur grésille dès que le jeu a une image un peu lente.
+    // Tous les sons passent par « general », le volume réglé avec le bouton en haut à droite.
     window.sonsWeb = {
         ctx: null,
+        general: null,
         buffers: {},
+        volume: 0.5,
         async charger(noms) {
             this.ctx = this.ctx || new (window.AudioContext || window.webkitAudioContext)({ latencyHint: "interactive" });
+            if (!this.general) {
+                this.general = this.ctx.createGain();
+                this.general.gain.value = this.volume;
+                this.general.connect(this.ctx.destination);
+            }
             await Promise.all(noms.split(",").map(async (nom) => {
                 const reponse = await fetch("sons/" + nom + ".ogg");
                 this.buffers[nom] = await this.ctx.decodeAudioData(await reponse.arrayBuffer());
@@ -308,10 +368,46 @@ function show_infobox() {
             const gain = this.ctx.createGain();
             source.buffer = buffer;
             gain.gain.value = volume;
-            source.connect(gain).connect(this.ctx.destination);
+            source.connect(gain).connect(this.general);
             source.start();
         },
+        regler(volume) {
+            this.volume = volume;
+            if (this.general) this.general.gain.setTargetAtTime(volume, this.ctx.currentTime, 0.02);
+        },
     };
+
+    // Bouton et curseur de volume. Le réglage est retenu dans le navigateur (localStorage).
+    document.addEventListener("DOMContentLoaded", () => {
+        const boite = document.getElementById("volume");
+        const bouton = boite.querySelector("button");
+        const curseur = boite.querySelector("input");
+        let avantMuet = 50;
+
+        const lire = () => { try { return localStorage.getItem("pixel-punch-volume"); } catch { return null; } };
+        const retenir = (v) => { try { localStorage.setItem("pixel-punch-volume", v); } catch {} };
+
+        const appliquer = (pourcent) => {
+            curseur.value = pourcent;
+            sonsWeb.regler(pourcent / 100);
+            boite.classList.toggle("est-muet", pourcent == 0);
+            bouton.setAttribute("aria-label", pourcent == 0 ? "Remettre le son" : "Couper le son");
+            retenir(pourcent);
+        };
+        const rendreLaMain = () => { curseur.blur(); bouton.blur(); document.getElementById("canvas").focus(); };
+
+        appliquer(lire() ?? 50);
+        curseur.addEventListener("input", () => appliquer(Number(curseur.value)));
+        curseur.addEventListener("change", rendreLaMain);
+        bouton.addEventListener("click", () => {
+            if (Number(curseur.value) > 0) { avantMuet = Number(curseur.value); appliquer(0); }
+            else appliquer(avantMuet || 50);
+            rendreLaMain();
+        });
+        // Les flèches servent au curseur, pas au jeu, tant qu'il a le focus
+        boite.addEventListener("keydown", (e) => e.stopPropagation());
+        boite.addEventListener("keyup", (e) => e.stopPropagation());
+    });
     </script>
     <script>
 /*
@@ -351,6 +447,17 @@ height="{{cookiecutter.height}}px"
     </canvas>
 
     <div id="infobox">Chargement…</div>
+
+    <div id="volume">
+        <button type="button" aria-label="Couper le son">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M11 5 6 9H2v6h4l5 4z" fill="currentColor"/>
+                <path class="ondes" d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/>
+                <path class="muet" d="m16 9 6 6m0-6-6 6"/>
+            </svg>
+        </button>
+        <input type="range" min="0" max="100" step="1" value="50" aria-label="Volume">
+    </div>
 
     <div id=html></div>
 
