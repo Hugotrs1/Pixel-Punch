@@ -31,6 +31,10 @@ NAV_GAUCHE = (pg.KSCAN_LEFT, pg.KSCAN_A)
 NAV_DROITE = (pg.KSCAN_RIGHT, pg.KSCAN_D)
 VALIDER = (pg.KSCAN_RETURN, pg.KSCAN_KP_ENTER, pg.KSCAN_SPACE)
 
+# Version navigateur (pygbag) : taille fixe en 16:9, c'est la page web qui l'agrandit à l'écran.
+WEB = sys.platform == "emscripten"
+TAILLE_WEB = (1280, 720)
+
 
 def rendre_net_sous_windows():
     """Sans ça, Windows agrandit la fenêtre en la floutant quand l'affichage est zoomé (125 %, 150 %...)."""
@@ -45,6 +49,9 @@ def rendre_net_sous_windows():
 class Jeu:
     def __init__(self, plein_ecran: bool = True):
         rendre_net_sous_windows()
+        # Son en 48 kHz stéréo comme les fichiers .ogg (et comme la plupart des cartes son et navigateurs) :
+        # sans conversion, pas de son déformé. À régler AVANT pg.init(), qui ouvre la sortie audio.
+        pg.mixer.pre_init(48000, -16, 2, 1024)
         pg.init()
         pg.display.set_caption(cfg.TITRE)
         self.horloge = pg.time.Clock()
@@ -71,7 +78,9 @@ class Jeu:
 
     # -- fenêtre --------------------------------------------------------------
     def ouvrir_fenetre(self, taille=None):
-        if self.plein_ecran:
+        if WEB:
+            self.ecran = pg.display.set_mode(TAILLE_WEB)
+        elif self.plein_ecran:
             self.ecran = pg.display.set_mode((0, 0), pg.FULLSCREEN)
         else:
             self.ecran = pg.display.set_mode(taille or (1280, 720), pg.RESIZABLE)
@@ -259,10 +268,10 @@ class Jeu:
         if e.type == pg.QUIT:
             return False
         self.clavier.evenement(e)
-        if e.type == pg.VIDEORESIZE and not self.plein_ecran:
+        if e.type == pg.VIDEORESIZE and not self.plein_ecran and not WEB:
             self.ouvrir_fenetre((max(640, e.w), max(360, e.h)))
             return True
-        if e.type == pg.KEYDOWN and e.key == pg.K_F11:
+        if e.type == pg.KEYDOWN and e.key == pg.K_F11 and not WEB:
             self.plein_ecran = not self.plein_ecran
             self.ouvrir_fenetre()
             return True

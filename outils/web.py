@@ -30,7 +30,9 @@ def preparer():
 
 
 def pygbag(*options: str):
-    subprocess.run([sys.executable, "-m", "pygbag", *options, str(SOURCE)], check=True)
+    # outils/pygbag.tmpl : page de chargement aux couleurs du jeu (au lieu du bleu ciel par défaut)
+    modele = Path(__file__).with_name("pygbag.tmpl")
+    subprocess.run([sys.executable, "-m", "pygbag", "--template", str(modele), *options, str(SOURCE)], check=True)
 
 
 def deployer():
