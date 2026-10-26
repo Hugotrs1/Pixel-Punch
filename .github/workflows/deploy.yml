@@ -1,0 +1,29 @@
+# À chaque push sur main : build web avec pygbag puis envoi sur https://jeu.hugotrs.fr
+# La clé DEPLOY_SSH_KEY ne peut que déposer un site (voir /srv/scripts/deploy-receive.sh sur le serveur).
+name: Déploiement
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency: deploy
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pygbag
+      - run: python outils/web.py build
+      - name: Envoi sur jeu.hugotrs.fr
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          echo "hugotrs.fr ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF7AzFQ2qszF2tfgkRkDlrHOVfZape64Ilxl40zpxSMb" > ~/.ssh/known_hosts
+          tar -czf - -C build/pixel-punch/build/web . | ssh -i ~/.ssh/deploy hugo@hugotrs.fr "site combat-poo"
